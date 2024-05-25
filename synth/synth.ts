@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
-import { startLoadingSample, sampleLoadingState, SampleLoadingState, sampleLoadEvents, SampleLoadedEvent, SampleLoadingStatus, loadBuiltInSamples, Dictionary, DictionaryArray, toNameMap, FilterType, SustainType, EnvelopeType, InstrumentType, EffectType, EnvelopeComputeIndex, Transition, Unison, Chord, Vibrato, Envelope, AutomationTarget, Config, getDrumWave, drawNoiseSpectrum, getArpeggioPitchIndex, performIntegralOld, getPulseWidthRatio, effectsIncludeTransition, effectsIncludeChord, effectsIncludePitchShift, effectsIncludeDetune, effectsIncludeVibrato, effectsIncludeNoteFilter, effectsIncludeDistortion, effectsIncludeBitcrusher, effectsIncludePanning, effectsIncludeChorus, effectsIncludeEcho, effectsIncludeReverb, OperatorWave } from "./SynthConfig";
+import { startLoadingSample, sampleLoadingState, SampleLoadingState, sampleLoadEvents, SampleLoadedEvent, SampleLoadingStatus, loadBuiltInSamples, Dictionary, DictionaryArray, toNameMap, FilterType, SustainType, EnvelopeType, InstrumentType, EffectType, EnvelopeComputeIndex, Transition, Unison, Chord, Vibrato, Envelope, AutomationTarget, Config, getDrumWave, drawNoiseSpectrum, getArpeggioPitchIndex, performIntegralOld, getPulseWidthRatio, effectsIncludeTransition, effectsIncludeChord, effectsIncludePitchShift, effectsIncludeDetune, effectsIncludeVibrato, effectsIncludeNoteFilter, effectsIncludeDistortion, effectsIncludeBitcrusher, effectsIncludePanning, effectsIncludeChorus, effectsIncludeEcho, effectsIncludeReverb, OperatorWave, SoundfontLoadedEvent, soundfontLoadEvents, soundfontLoadingState, startLoadingSoundfont } from "./SynthConfig";
 import { Preset, EditorConfig } from "../editor/EditorConfig";
 import { scaleElementsByFactor, inverseRealFourierTransform } from "./FFT";
 import { Deque } from "./Deque";
@@ -257,10 +257,10 @@ const enum SongTagCode {
 	feedbackEnvelope    = CharCode.V, // added in BeepBox URL version 6, DEPRECATED
 	pulseWidth          = CharCode.W, // added in BeepBox URL version 7
 	aliases             = CharCode.X, // added in JummBox URL version 4 for aliases, DEPRECATED, [UB] repurposed for PWM decimal offset (DEPRECATED as well)
-//	                    = CharCode.Y,
-//	                    = CharCode.Z,
-//	                    = CharCode.NUM_0,
-//	                    = CharCode.NUM_1,
+	soundfont           = CharCode.Y,
+	soundfont_bank      = CharCode.Z,
+	soundfont_patch     = CharCode.NUM_0,
+	soundfont_canLoop   = CharCode.NUM_1,
 //	                    = CharCode.NUM_2,
 //	                    = CharCode.NUM_3,
 //	                    = CharCode.NUM_4,
@@ -1447,6 +1447,10 @@ export class Instrument {
     public modulators: number[] = [];
     public modFilterTypes: number[] = [];
     public invalidModulators: boolean[] = [];
+    public soundfont: number = 0;
+    public soundfont_bank: number = 0;
+    public soundfont_patch: number = 0;
+    public soundfont_canLoop: boolean = true;
     constructor(isNoiseChannel: boolean, isModChannel: boolean) {
 
         // @jummbus - My screed on how modulator arrays for instruments work, for the benefit of myself in the future, or whoever else.
@@ -1670,6 +1674,13 @@ export class Instrument {
 				this.pulseWidth = Config.pulseWidthRange - 1;
                 this.decimalOffset = 0;
 				break;
+            case InstrumentType.soundfont:
+                    this.chord = Config.chords.dictionary["simultaneous"].index;
+                    this.soundfont = 0;
+                    this.soundfont_bank = 0;
+                    this.soundfont_patch = 0;
+                    this.soundfont_canLoop = true;
+                    break;
             default:
                 throw new Error("Unrecognized instrument type: " + type);
         }
@@ -3378,6 +3389,16 @@ export class Song {
                     for (let j: number = 0; j < 64; j++) {
                         buffer.push(base64IntToCharCode[(instrument.customChipWave[j] + 24) as number]);
                     }
+                } else if (instrument.type == InstrumentType.soundfont) {
+                    buffer.push(SongTagCode.soundfont, base64IntToCharCode[instrument.soundfont]); 
+
+                    buffer.push(SongTagCode.soundfont_bank); 
+                    encode32BitNumber(buffer, instrument.soundfont_bank); //kiiinda overkill but i am tired and have no idea how url stuff works
+                    buffer.push(SongTagCode.soundfont_patch); 
+                    encode32BitNumber(buffer, instrument.soundfont_patch);
+
+                    buffer.push(SongTagCode.soundfont_canLoop, base64IntToCharCode[Number(instrument.soundfont_canLoop)]); 
+                    if (instrument.unison == Config.unisons.length) encodeUnisonSettings(buffer, instrument.unisonVoices, instrument.unisonSpread, instrument.unisonOffset, instrument.unisonExpression, instrument.unisonSign);
                 } else if (instrument.type == InstrumentType.noise) {
                     buffer.push(SongTagCode.wave, base64IntToCharCode[instrument.chipNoise]);
                     buffer.push(SongTagCode.unison, base64IntToCharCode[instrument.unison]);
@@ -3791,6 +3812,17 @@ export class Song {
                         sampleLoadingState.totalSamples,
                         sampleLoadingState.samplesLoaded
                     ));
+
+                    soundfontLoadingState.statusTable = {};
+                    soundfontLoadingState.urlTable = {};
+                    soundfontLoadingState.totalSoundfonts = 0;
+                    soundfontLoadingState.soundfontsLoaded = 0;
+                    soundfontLoadEvents.dispatchEvent(new SoundfontLoadedEvent(
+                        soundfontLoadingState.totalSoundfonts,
+                        soundfontLoadingState.soundfontsLoaded
+                    ));
+                    startLoadingSoundfont("https://file.garden/ZMTXG25nmTe-x3VU/gm.sf2",0); // TEMP
+
                     for (const url of compressed_array) {
                         if (url.toLowerCase() === "legacysamples") {
                             if (!willLoadLegacySamples) {
@@ -4464,6 +4496,25 @@ export class Song {
                     instrument.decimalOffset = clamp(0, 99 + 1, (base64CharCodeToInt[compressed.charCodeAt(charIndex++)] << 6) + base64CharCodeToInt[compressed.charCodeAt(charIndex++)]);
                 }
 
+            } break;
+            case SongTagCode.soundfont: {
+                const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
+                instrument.soundfont = base64CharCodeToInt[compressed.charCodeAt(charIndex++)];
+            } break;
+            case SongTagCode.soundfont_bank: {
+                const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
+                instrument.soundfont_bank = decode32BitNumber(compressed, charIndex);
+                charIndex += 6;
+            } break;
+            case SongTagCode.soundfont_patch: {
+                const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
+                instrument.soundfont_patch = decode32BitNumber(compressed, charIndex);
+                charIndex += 6;
+            } break;
+            case SongTagCode.soundfont_canLoop: {
+                const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
+                const canLoop = base64CharCodeToInt[compressed.charCodeAt(charIndex++)];
+                instrument.soundfont_canLoop = Boolean(canLoop & 1);
             } break;
             case SongTagCode.stringSustain: {
                 const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
@@ -7382,6 +7433,10 @@ class InstrumentState {
             public chipWavePlayBackwards = false;
             public chipWaveStartOffset = 0;
             // advloop addition
+    public soundfont: number = 0;
+    public soundfont_bank: number = 0;
+    public soundfont_canLoop: boolean = true;
+    public soundfont_patch: number = 0;
     public noisePitchFilterMult: number = 1.0;
     public unison: Unison | null = null;
     public unisonVoices: number = 1;
@@ -7441,6 +7496,7 @@ class InstrumentState {
     public panningOffsetR: number = 0.0;
     public panningOffsetDeltaL: number = 0.0;
     public panningOffsetDeltaR: number = 0.0;
+    public pitchShift: number = 0.0;
 
     public chorusDelayLineL: Float32Array | null = null;
     public chorusDelayLineR: Float32Array | null = null;
@@ -8083,6 +8139,18 @@ class InstrumentState {
             this.unisonOffset = instrument.unisonOffset;
             this.unisonExpression = instrument.unisonExpression;
             this.unisonSign = instrument.unisonSign;
+        } else if (instrument.type == InstrumentType.soundfont) {
+            this.wave = Config.rawChipWaves[0].samples;
+            this.pitchShift = instrument.pitchShift;
+            this.unisonVoices = instrument.unisonVoices;
+            this.unisonSpread = instrument.unisonSpread;
+            this.unisonOffset = instrument.unisonOffset;
+            this.unisonExpression = instrument.unisonExpression;
+            this.unisonSign = instrument.unisonSign;
+
+            this.soundfont = instrument.soundfont;
+            this.soundfont_bank = instrument.soundfont_bank;
+            this.soundfont_patch = instrument.soundfont_patch;
         } else if (instrument.type == InstrumentType.noise) {
             this.wave = getDrumWave(instrument.chipNoise, inverseRealFourierTransform, scaleElementsByFactor);
             this.unisonVoices = instrument.unisonVoices;
@@ -10334,7 +10402,19 @@ export class Synth {
 					basePitch = -51 + Config.chipWaves[instrument.chipWave].extraSampleDetune!;
 					}
 				}
-            } else if (instrument.type == InstrumentType.customChipWave) {
+        } else if (instrument.type == InstrumentType.soundfont) {
+            const soundfont = Config.soundfonts[instrument.soundfont]; // TEMP
+            const bank = soundfont.banks.find((s: any) => s.id == instrument.soundfont_bank);
+            const instId = bank.presets[instrument.soundfont_patch].instrument
+            const sampleId = soundfont.instruments[instId].pitchSampleIds[tone.pitches[0]+ instrumentState.pitchShift-12].amount;
+            let sample = Config.soundfonts[instrument.soundfont].samples[Number(sampleId)];
+            if (sample != null) {
+                basePitch += -96.37 + Math.log2(sample.samples.length / sample.sampleRate) * -12 - (-48 + sample.pitch);
+                baseExpression = Config.chipBaseExpression + (soundfont.instruments[instId].pitchSampleIds[tone.pitches[0] + instrumentState.pitchShift - 12].initialAttenuation/700);
+            } else {
+                sample = Float32Array.from([0,0,0]);
+            }
+        } else if (instrument.type == InstrumentType.customChipWave) {
             baseExpression = Config.chipBaseExpression;
         } else if (instrument.type == InstrumentType.harmonics) {
             baseExpression = Config.harmonicsBaseExpression;
@@ -10962,7 +11042,7 @@ export class Synth {
             }
 
             const startFreq: number = Instrument.frequencyFromPitch(startPitch);
-            if (instrument.type == InstrumentType.chip || instrument.type == InstrumentType.customChipWave || instrument.type == InstrumentType.harmonics || instrument.type == InstrumentType.pickedString || instrument.type == InstrumentType.spectrum || instrument.type == InstrumentType.pwm || instrument.type == InstrumentType.noise) {
+            if (instrument.type == InstrumentType.chip || instrument.type == InstrumentType.customChipWave || InstrumentType.soundfont || instrument.type == InstrumentType.harmonics || instrument.type == InstrumentType.pickedString || instrument.type == InstrumentType.spectrum || instrument.type == InstrumentType.pwm || instrument.type == InstrumentType.noise) {
                 // These instruments have two waves at different frequencies for the unison feature.
                 //const unison: Unison = Config.unisons[instrument.unison];
                 const unisonVoices: number = instrument.unisonVoices;
@@ -11310,6 +11390,8 @@ export class Synth {
             return Synth.drumsetSynth;
         } else if (instrument.type == InstrumentType.mod) {
             return Synth.modSynth;
+        } else if (instrument.type == InstrumentType.soundfont) {
+            return Synth.loopableChipSynth;
         } else if (instrument.type == InstrumentType.fm6op) {
             const fingerprint: string = instrument.customAlgorithm.name + "_" + instrument.customFeedbackType.name;
             if (Synth.fm6SynthFunctionCache[fingerprint] == undefined) {

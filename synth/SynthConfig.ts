@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import Parser from './sf2/sf2.js';
+
 export interface Dictionary<T> {
     [K: string]: T;
 }
@@ -73,10 +75,11 @@ export const enum InstrumentType {
     customChipWave,
     mod,
 	fm6op,
+    soundfont,
     length,
 }
 
-export const TypePresets: ReadonlyArray<string> = ["chip", "FM", "noise", "spectrum", "drumset", "harmonics", "pulse width", "picked string", "supersaw", "chip (custom)", "mod", "FM (6-op)"];
+export const TypePresets: ReadonlyArray<string> = ["chip", "FM", "noise", "spectrum", "drumset", "harmonics", "pulse width", "picked string", "supersaw", "chip (custom)", "mod", "FM (6-op)", "soundfont"];
 
 export const enum DropdownID {
     Vibrato = 0,
@@ -270,6 +273,34 @@ export interface AutomationTarget extends BeepBoxOption {
     readonly compatibleInstruments: InstrumentType[] | null;
 }
 
+export const enum SoundfontLoadingStatus {
+    loading,
+    loaded,
+    error,
+}
+
+export function getSoundfontLoadingStatusName(status: SoundfontLoadingStatus): string {
+    switch (status) {
+	case SoundfontLoadingStatus.loading: return "loading";
+	case SoundfontLoadingStatus.loaded: return "loaded";
+	case SoundfontLoadingStatus.error: return "error";
+    }
+}
+
+export class SoundfontLoadingState {
+    public statusTable: Dictionary<SoundfontLoadingStatus>;
+    public urlTable: Dictionary<string>;
+    public totalSoundfonts: number;
+    public soundfontsLoaded: number;
+
+    constructor() {
+        this.statusTable = {};
+        this.urlTable = {};
+        this.totalSoundfonts = 0;
+        this.soundfontsLoaded = 0;
+    }
+}
+
 export const enum SampleLoadingStatus {
     loading,
     loaded,
@@ -299,6 +330,7 @@ export class SampleLoadingState {
 }
 
 export const sampleLoadingState: SampleLoadingState = new SampleLoadingState();
+export const soundfontLoadingState: SoundfontLoadingState = new SoundfontLoadingState();
 
 export class SampleLoadedEvent extends Event {
     public readonly totalSamples: number;
@@ -321,7 +353,140 @@ export class SampleLoadEvents extends EventTarget {
     }
 }
 
+export class SoundfontLoadedEvent extends Event {
+    public readonly totalSoundfonts: number;
+    public readonly soundfontsLoaded: number;
+
+    constructor(totalSoundfonts: number, soundfontsLoaded: number) {
+	super("soundfontloaded");
+	this.totalSoundfonts = totalSoundfonts;
+	this.soundfontsLoaded = soundfontsLoaded;
+    }
+}
+
+export interface SoundfontLoadEventMap {
+    "soundfontloaded": SoundfontLoadedEvent;
+}
+
+export class SoundfontLoadEvents extends EventTarget {
+    constructor() {
+	super();
+    }
+}
+
+export interface Soundfont extends BeepBoxOption  { // i know this is like. really lazy  but im tired i want to move on from this part aaaaaAAAAAAAGH
+    soundfontName: any;
+    instruments: any;
+    samples: any;
+    banks: any;
+}
+
 export const sampleLoadEvents: SampleLoadEvents = new SampleLoadEvents();
+export const soundfontLoadEvents: SoundfontLoadEvents = new SoundfontLoadEvents();
+
+function cleanName(name: string) {
+    return name.replace(/\0[\s\S]*$/gm, "").trim();
+}
+
+    //TODO: proper loading, more error checking (function in synth)
+export function startLoadingSoundfont(url: string, Index: number, ): void {
+    fetch(url).then((response) => {
+        if (!response.ok) {
+            //add loading state thing later
+            return Promise.reject(new Error("Couldn't load soundfont"));
+        }
+        return response.arrayBuffer();
+    }).then((arrayBuffer) => {
+        const newparser:any = new Parser(new Uint8Array(arrayBuffer),0);
+        newparser.parse();
+
+        const instruments = newparser.createInstrument();
+        const presets = newparser.createPreset();
+        const soundfontName = cleanName(decodeURIComponent(url.replace(/^([^\/]*\/)+/, "")));
+        const newSoundfont:any = {
+            soundfontName: soundfontName,
+            name: soundfontName,
+            instruments: [],
+            samples: [],
+            banks: []
+        };
+        
+        presets.forEach((preset: any) => {
+            const newPreset = {
+                presetName: cleanName(preset.header.presetName),
+                instrument: preset.instrument,
+                bank: preset.header.bank
+            };
+            if (newPreset.presetName == "EOP") return;
+
+            var inBank = newSoundfont.banks.findIndex((s: any) => s.id == newPreset.bank);
+            if (inBank == -1) {
+                const newBank = {
+                    id: preset.header.bank,
+                    presets: []
+                }
+                newBank.presets.push(<never>newPreset);
+                newSoundfont.banks.push(newBank);
+            } else {
+                newSoundfont.banks[inBank].presets.push(newPreset);
+            }
+
+        });
+        
+        instruments.forEach((instrument: any) => {
+            const newInstrument = {
+                keyRange: {
+                    lo:instrument.info[0].generator.keyRange.lo,
+                    hi:instrument.info[0].generator.keyRange.hi
+                },
+                pitchSampleIds: <any>[], // this works??????????
+            };
+            var temp = [0];
+            temp.length = 127;
+            if (instrument.info.length > 1) {
+                temp.fill(<any>{amount: -1},0,temp.length);
+                for (let i = 1; i < instrument.info.length; i++) {
+                    let temp2 = instrument.info[i].generator;
+                    let initialAttenuation = 0;
+                    if (temp2.hasOwnProperty("initialAttenuation") && temp2.initialAttenuation.amount != undefined) {
+                        initialAttenuation = temp2.initialAttenuation.amount;
+                    }
+                    temp.fill(<any>{
+                        amount: temp2.sampleID.amount,
+                        initialAttenuation: initialAttenuation
+                    },temp2.keyRange.lo,temp2.keyRange.hi+1);
+                }
+            } else {
+                temp.fill(instrument.info[0].generator.sampleID,0,temp.length);
+            }
+            newInstrument.pitchSampleIds = temp
+            newSoundfont.instruments.push(newInstrument);
+        });
+        
+        for (let i = 0; i < newparser.sampleHeader.length; i++) {
+            let s = newparser.sampleHeader[i];
+            const newSample = {
+                sampleLength: {start:s.start,end:s.end},
+                sampleLoop: {start:s.startLoop,end:s.endLoop},
+                pitch: s.originalPitch,
+                pitchDetune: s.pitchCorrection,
+                sampleRate: s.sampleRate,
+                samples: centerAndNormalizeWave(Array.from(newparser.sample[i]))
+            }
+            newSoundfont.samples.push(newSample);
+        }
+        Config.soundfonts[Index] = newSoundfont;
+        soundfontLoadingState.totalSoundfonts = 1;
+        soundfontLoadingState.soundfontsLoaded = 1;
+        console.log(newSoundfont);
+        console.log(Config.soundfonts);
+        soundfontLoadEvents.dispatchEvent(new SoundfontLoadedEvent(
+            soundfontLoadingState.totalSoundfonts,
+            soundfontLoadingState.soundfontsLoaded
+        ));
+    })
+}
+//
 
 export async function startLoadingSample(url: string, chipWaveIndex: number, presetSettings: Dictionary<any>, rawLoopOptions: any, customSampleRate: number): Promise<void> {
     // @TODO: Make parts of the code that expect everything to already be
@@ -939,7 +1104,7 @@ export class Config {
 		{ name: "freehand", stepsPerBeat: 24, /*ticksPerArpeggio: 3, arpeggioPatterns: [[0], [0, 1], [0, 1, 2, 1], [0, 1, 2, 3]]*/ roundUpThresholds: null },
 	]);
 
-    public static readonly instrumentTypeNames: ReadonlyArray<string> = ["chip", "FM", "noise", "spectrum", "drumset", "harmonics", "PWM", "Picked String", "supersaw", "custom chip", "mod", "FM6op"];
+    public static readonly instrumentTypeNames: ReadonlyArray<string> = ["chip", "FM", "noise", "spectrum", "drumset", "harmonics", "PWM", "Picked String", "supersaw", "custom chip", "mod", "FM6op", "soundfont"];
 	public static readonly instrumentTypeHasSpecialInterval: ReadonlyArray<boolean> = [true, true, false, false, false, true, false, false, false, false, false];
     public static readonly chipBaseExpression: number = 0.03375; // Doubled by unison feature, but affected by expression adjustments per unison setting and wave shape.
     public static readonly fmBaseExpression: number = 0.03;
@@ -952,6 +1117,7 @@ export class Config {
     public static readonly pickedStringBaseExpression: number = 0.025; // Same as harmonics.
     public static readonly distortionBaseVolume: number = 0.011; // Distortion is not affected by pitchDamping, which otherwise approximately halves expression for notes around the middle of the range.
     public static readonly bitcrusherBaseVolume: number = 0.010; // Also not affected by pitchDamping, used when bit crushing is maxed out (aka "1-bit" output).
+    public static soundfonts: DictionaryArray<Soundfont> = toNameMap([]);
 	public static rawChipWaves: DictionaryArray<ChipWave> = toNameMap([
         { name: "rounded", expression: 0.94, samples: centerWave([0.0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.2, 0.0, -0.2, -0.4, -0.5, -0.6, -0.7, -0.8, -0.85, -0.9, -0.95, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -0.95, -0.9, -0.85, -0.8, -0.7, -0.6, -0.5, -0.4, -0.2]) },
         { name: "triangle", expression: 1.0, samples: centerWave([1.0 / 15.0, 3.0 / 15.0, 5.0 / 15.0, 7.0 / 15.0, 9.0 / 15.0, 11.0 / 15.0, 13.0 / 15.0, 15.0 / 15.0, 15.0 / 15.0, 13.0 / 15.0, 11.0 / 15.0, 9.0 / 15.0, 7.0 / 15.0, 5.0 / 15.0, 3.0 / 15.0, 1.0 / 15.0, -1.0 / 15.0, -3.0 / 15.0, -5.0 / 15.0, -7.0 / 15.0, -9.0 / 15.0, -11.0 / 15.0, -13.0 / 15.0, -15.0 / 15.0, -15.0 / 15.0, -13.0 / 15.0, -11.0 / 15.0, -9.0 / 15.0, -7.0 / 15.0, -5.0 / 15.0, -3.0 / 15.0, -1.0 / 15.0]) },
