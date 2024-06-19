@@ -93,6 +93,34 @@
 <font color="#9c64f7">Patch Notes (in reverse chronological order);</font>
 </h1>
 
+<h2>Version 2.2.9</h2>
+	<h3> <ul>
+	<li>Added a preference for instrument scrollbars instead of outright removing them</li>
+	<li>Actually ported the Jummbox bugfix for song data not saving properly</li>
+	<li>Ported the <a href="https://github.com/jummbus/jummbox/commit/b0efe3b47392f19b2b9ac2c78d0b90f4e32e24d3#diff-4325f2ebdd213554faab7f9ddf2349a1c845d9d8e05f11eddb35c61f5150f1bf">latest bugfixes</a> from Jummbox</li>
+	<li>Removed excessive code for the bugfix regarding drumset spectrums from 2.2.8</li>
+	</ul> </h3>
+	<p>6/3/2024</p>
+
+<h2>Version 2.2.8</h2>
+	<h3> <ul>
+	<li>Ported Unbox's Shift+F keybind and Voxbox's Shift+Enter keybind</li>
+		<ul>
+		<li>The former moves the playhead to the start of the loop bar instead of the start of the song</li>
+		<li>...and the latter enters a bar behind the selection instead of ahead</li>
+		</ul>
+	<li>Added the <code>--text-spacing-icon </code> and <code>--scrollbar-color</code> theme variables</li>
+		<ul>
+		<li>Because of this, scrollbars will look different on Firefox</li>
+		</ul>
+	<li>Updated the Abyssbox Light and Abyssbox Dark themes</li>
+	<li>Removed scrollbars from the instrument settings</li>
+	<li>Fixed unisons not saving in .jsons when using PWM, Harmonics, or Spectrum</li>
+	<li>Fixed synth weirdness related to drumset spectrums not being reset</li>
+	<li>Fixed the importing of Modbox's "-2 octaves" offset setting</li>
+	</ul> </h3>
+	<p>5/25/2024</p>
+
 <h2>Version 2.2.7</h2>
 	<h3> <ul>
 	<!-- <li>UB is now a Jummbox fork instead of a GoldBox fork!</li> -->
@@ -120,7 +148,7 @@
 	<li>Added Unisons to the PWM, Spectrum, and Noise instrument types</li>
 	<li>Added the Shortener Config Prompt</li>
 	<ul>
-		<li>Currently the only options are <a href="https://tinyurl.com">tinyurl.com</a> and <a href="https://is.gd">is.gd</a>...</li>
+		<li>This currently only supports <a href="https://tinyurl.com">tinyurl.com</a> and <a href="https://is.gd">is.gd</a>...</li>
 	</ul>
 	<li>Adjusted padding of Abyssbox themes and certain layouts</li>
 	<li>Updated the Abyssbox Light theme</li>
