@@ -273,6 +273,22 @@ export interface AutomationTarget extends BeepBoxOption {
     readonly compatibleInstruments: InstrumentType[] | null;
 }
 
+export function getSoundfontBankIds(soundfont: Soundfont) {
+    if (soundfont == null) return [""];
+    let allBanks: any[] = [];
+    allBanks = soundfont.banks.map((s: any) => s.id);
+    return allBanks;
+}
+
+export function getSoundfontBankInstruments(soundfont: Soundfont, fromBank: number) {
+    if (soundfont == null) return [""];
+    var inBank = soundfont.banks.findIndex((s: any) => s.id == fromBank);
+    if (inBank != -1) {
+        return soundfont.banks[inBank].presets;
+    }
+    return [""];
+}
+
 export const enum SoundfontLoadingStatus {
     loading,
     loaded,
@@ -415,6 +431,7 @@ export function startLoadingSoundfont(url: string, Index: number, ): void {
             const newPreset = {
                 presetName: cleanName(preset.header.presetName),
                 instrument: preset.instrument,
+                instrumentArray: [],
                 bank: preset.header.bank
             };
             if (newPreset.presetName == "EOP") return;
@@ -430,6 +447,19 @@ export function startLoadingSoundfont(url: string, Index: number, ): void {
             } else {
                 newSoundfont.banks[inBank].presets.push(newPreset);
             }
+
+            var temp = [0];
+            temp.length = 127;
+            temp.fill(preset.instrument,0,temp.length);
+
+            if (preset.info.length > 2) { // presets also have key ranges apparently....
+                for (let i = 1; i < preset.info.length; i++) {
+                    let temp2 = preset.info[i].generator;
+                    temp.fill(temp2.instrument.amount,temp2.keyRange.lo,temp2.keyRange.hi+1);
+                }
+            }
+
+            newPreset.instrumentArray = <any>temp;
 
         });
         
@@ -448,12 +478,17 @@ export function startLoadingSoundfont(url: string, Index: number, ): void {
                 for (let i = 1; i < instrument.info.length; i++) {
                     let temp2 = instrument.info[i].generator;
                     let initialAttenuation = 0;
+                    let overridingRootKey = -1;
                     if (temp2.hasOwnProperty("initialAttenuation") && temp2.initialAttenuation.amount != undefined) {
                         initialAttenuation = temp2.initialAttenuation.amount;
                     }
+                    if (temp2.hasOwnProperty("overridingRootKey") && temp2.overridingRootKey.amount != undefined) {
+                        overridingRootKey = temp2.overridingRootKey.amount;
+                    }
                     temp.fill(<any>{
                         amount: temp2.sampleID.amount,
-                        initialAttenuation: initialAttenuation
+                        initialAttenuation: initialAttenuation,
+                        overridingRootKey: overridingRootKey
                     },temp2.keyRange.lo,temp2.keyRange.hi+1);
                 }
             } else {

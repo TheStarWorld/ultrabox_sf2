@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
 //import {Layout} from "./Layout";
-import { sampleLoadEvents, SampleLoadedEvent, InstrumentType, EffectType, Config, effectsIncludeTransition, effectsIncludeChord, effectsIncludePitchShift, effectsIncludeDetune, effectsIncludeVibrato, effectsIncludeNoteFilter, effectsIncludeDistortion, effectsIncludeBitcrusher, effectsIncludePanning, effectsIncludeChorus, effectsIncludeEcho, effectsIncludeReverb, DropdownID } from "../synth/SynthConfig";
+import { sampleLoadEvents, SampleLoadedEvent, InstrumentType, EffectType, Config, effectsIncludeTransition, effectsIncludeChord, effectsIncludePitchShift, effectsIncludeDetune, effectsIncludeVibrato, effectsIncludeNoteFilter, effectsIncludeDistortion, effectsIncludeBitcrusher, effectsIncludePanning, effectsIncludeChorus, effectsIncludeEcho, effectsIncludeReverb, DropdownID, soundfontLoadEvents, getSoundfontBankIds, getSoundfontBankInstruments } from "../synth/SynthConfig";
 import { BarScrollBar } from "./BarScrollBar";
 import { BeatsPerBarPrompt } from "./BeatsPerBarPrompt";
 import { Change, ChangeGroup } from "./Change";
@@ -46,7 +46,7 @@ import { SpectrumEditor } from "./SpectrumEditor";
 import { CustomPrompt } from "./CustomPrompt";
 import { ThemePrompt } from "./ThemePrompt";
 import { TipPrompt } from "./TipPrompt";
-import { ChangeTempo, ChangeKeyOctave, ChangeChorus, ChangeEchoDelay, ChangeEchoSustain, ChangeReverb, ChangeVolume, ChangePan, ChangePatternSelection, ChangePatternsPerChannel, ChangePatternNumbers, ChangeSupersawDynamism, ChangeSupersawSpread, ChangeSupersawShape, ChangePulseWidth, ChangeFeedbackAmplitude, ChangeOperatorAmplitude, ChangeOperatorFrequency, ChangeDrumsetEnvelope, ChangePasteInstrument, ChangePreset, pickRandomPresetValue, ChangeRandomGeneratedInstrument, ChangeEQFilterType, ChangeNoteFilterType, ChangeEQFilterSimpleCut, ChangeEQFilterSimplePeak, ChangeNoteFilterSimpleCut, ChangeNoteFilterSimplePeak, ChangeScale, ChangeDetectKey, ChangeKey, ChangeRhythm, ChangeFeedbackType, ChangeAlgorithm, ChangeChipWave, ChangeNoiseWave, ChangeTransition, ChangeToggleEffects, ChangeVibrato, ChangeUnison, ChangeChord, ChangeSong, ChangePitchShift, ChangeDetune, ChangeDistortion, ChangeStringSustain, ChangeBitcrusherFreq, ChangeBitcrusherQuantization, ChangeAddEnvelope, ChangeEnvelopeSpeed, ChangeDiscreteEnvelope, ChangeAddChannelInstrument, ChangeRemoveChannelInstrument, ChangeCustomWave, ChangeOperatorWaveform, ChangeOperatorPulseWidth, ChangeSongTitle, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangeVibratoType, ChangePanDelay, ChangeArpeggioSpeed, ChangeFastTwoNoteArp, ChangeClicklessTransition, ChangeAliasing, ChangeSetPatternInstruments, ChangeHoldingModRecording, ChangeChipWavePlayBackwards, ChangeChipWaveStartOffset, ChangeChipWaveLoopEnd, ChangeChipWaveLoopStart, ChangeChipWaveLoopMode, ChangeChipWaveUseAdvancedLoopControls, ChangeDecimalOffset, ChangeUnisonVoices, ChangeUnisonSpread, ChangeUnisonOffset, ChangeUnisonExpression, ChangeUnisonSign, Change6OpFeedbackType, Change6OpAlgorithm, ChangeCustomAlgorythmorFeedback } from "./changes";
+import { ChangeTempo, ChangeKeyOctave, ChangeChorus, ChangeEchoDelay, ChangeEchoSustain, ChangeReverb, ChangeVolume, ChangePan, ChangePatternSelection, ChangePatternsPerChannel, ChangePatternNumbers, ChangeSupersawDynamism, ChangeSupersawSpread, ChangeSupersawShape, ChangePulseWidth, ChangeFeedbackAmplitude, ChangeOperatorAmplitude, ChangeOperatorFrequency, ChangeDrumsetEnvelope, ChangePasteInstrument, ChangePreset, pickRandomPresetValue, ChangeRandomGeneratedInstrument, ChangeEQFilterType, ChangeNoteFilterType, ChangeEQFilterSimpleCut, ChangeEQFilterSimplePeak, ChangeNoteFilterSimpleCut, ChangeNoteFilterSimplePeak, ChangeScale, ChangeDetectKey, ChangeKey, ChangeRhythm, ChangeFeedbackType, ChangeAlgorithm, ChangeChipWave, ChangeNoiseWave, ChangeTransition, ChangeToggleEffects, ChangeVibrato, ChangeUnison, ChangeChord, ChangeSong, ChangePitchShift, ChangeDetune, ChangeDistortion, ChangeStringSustain, ChangeBitcrusherFreq, ChangeBitcrusherQuantization, ChangeAddEnvelope, ChangeEnvelopeSpeed, ChangeDiscreteEnvelope, ChangeAddChannelInstrument, ChangeRemoveChannelInstrument, ChangeCustomWave, ChangeOperatorWaveform, ChangeOperatorPulseWidth, ChangeSongTitle, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangeVibratoType, ChangePanDelay, ChangeArpeggioSpeed, ChangeFastTwoNoteArp, ChangeClicklessTransition, ChangeAliasing, ChangeSetPatternInstruments, ChangeHoldingModRecording, ChangeChipWavePlayBackwards, ChangeChipWaveStartOffset, ChangeChipWaveLoopEnd, ChangeChipWaveLoopStart, ChangeChipWaveLoopMode, ChangeChipWaveUseAdvancedLoopControls, ChangeDecimalOffset, ChangeUnisonVoices, ChangeUnisonSpread, ChangeUnisonOffset, ChangeUnisonExpression, ChangeUnisonSign, Change6OpFeedbackType, Change6OpAlgorithm, ChangeCustomAlgorythmorFeedback, ChangeChosenSoundfont, ChangeChosenSoundfontBank, ChangeChosenSoundfontPatch, ChangeSoundfontCanLoop, ChangeChosenSoundfontInterpolation } from "./changes";
 
 import { TrackEditor } from "./TrackEditor";
 import { oscilascopeCanvas } from "../global/Oscilascope";
@@ -97,6 +97,7 @@ function buildPresetOptions(isNoise: boolean, idSet: string): HTMLSelectElement 
         menu.appendChild(option({ value: InstrumentType.pickedString }, EditorConfig.valueToPreset(InstrumentType.pickedString)!.name));
         menu.appendChild(option({ value: InstrumentType.spectrum }, EditorConfig.valueToPreset(InstrumentType.spectrum)!.name));
         menu.appendChild(option({ value: InstrumentType.noise }, EditorConfig.valueToPreset(InstrumentType.noise)!.name));
+        menu.appendChild(option({ value: InstrumentType.soundfont }, EditorConfig.instrumentToPreset(InstrumentType.soundfont)!.name));
     }
 
     // TODO - When you port over the Dogebox2 import/export buttons be sure to uncomment these
@@ -883,6 +884,18 @@ export class SongEditor {
     private readonly _chipWaveStartOffsetStepper = input({ type: "number", min: "0", step: "1", value: "0", style: "width: 100%; height: 1.5em; font-size: 80%; margin-left: 0.4em; vertical-align: middle;" });
     private readonly _chipWavePlayBackwardsBox = input({ type: "checkbox", style: "width: 1em; padding: 0; margin-left: 0.4em; margin-right: 4em;" });
     // advloop addition
+
+    private readonly _soundfontCanLoop = input({ type: "checkbox", style: "width: 1em; padding: 0; margin-left: 0.4em; margin-right: 4em;"});
+    private readonly _soundfontCanLoopRow: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", style: "font-size: x-small;", onclick: () => this._openPrompt("chipWave") }, "Allow Loop: "), this._soundfontCanLoop);
+    private readonly _soundfontSelect: HTMLSelectElement = buildOptions(select(), Config.soundfonts.map(sf => sf.name));
+    private readonly _soundfont: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("chipWave") }, "Soundfont: "), div({ class: "selectContainer" }, this._soundfontSelect));
+    private readonly _soundfontBankSelect: HTMLSelectElement = buildOptions(select(), ['']);
+    private readonly _soundfontBank: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("chipWave") }, "Bank: "), div({ class: "selectContainer" }, this._soundfontBankSelect));
+    private readonly _soundfontPatchSelect: HTMLSelectElement = buildOptions(select(), ['']);
+    private readonly _soundfontPatch: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("chipWave") }, "Patch: "), div({ class: "selectContainer" }, this._soundfontPatchSelect));
+    private readonly _soundfontInterpolation: HTMLSelectElement = buildOptions(select(), ["None", "Antialiasing", "Linear", "Bicubic"]);
+    private readonly _soundfontInterpolationRow: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", style: "font-size: x-small;", onclick: () => this._openPrompt("chipWave") }, "Interpolation: "), div({ class: "selectContainer" }, this._soundfontInterpolation));
+
 	private readonly _chipWaveSelectRow: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("chipWave") }, "Wave: "), div({ class: "selectContainer" }, this._chipWaveSelect));
     private readonly _chipNoiseSelectRow: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("chipNoise") }, "Noise: "), div({ class: "selectContainer" }, this._chipNoiseSelect));
     private readonly _visualLoopControlsButton: HTMLButtonElement = button({ style: "margin-left: 0em; padding-left: 0.2em; height: 1.5em; max-width: 12px;", onclick: () => this._openPrompt("visualLoopControls") }, "+");
@@ -1125,7 +1138,12 @@ export class SongEditor {
         this._panDropdownGroup,
         this._chipWaveSelectRow,
         this._chipNoiseSelectRow,
+    this._soundfont,
+    this._soundfontCanLoopRow,
+    this._soundfontBank,
+    this._soundfontPatch,
 	this._useChipWaveAdvancedLoopControlsRow,
+    this._soundfontInterpolationRow,
 	this._chipWaveLoopModeSelectRow,
 	this._chipWaveLoopStartRow,
 	this._chipWaveLoopEndRow,
@@ -1588,6 +1606,14 @@ export class SongEditor {
             this._chipWaveStartOffsetStepper.addEventListener("change", this._whenSetChipWaveStartOffset);
             this._chipWavePlayBackwardsBox.addEventListener("input", this._whenSetChipWavePlayBackwards);
             // advloop addition
+
+        this._soundfontCanLoop.addEventListener("input", this._whenSetSoundfontCanLoop);
+        this._soundfontSelect.addEventListener("change",this._whenSetSoundfont);
+        this._soundfontBankSelect.addEventListener("change",this._whenSetSoundfontBank);
+        this._soundfontPatchSelect.addEventListener("change",this._whenSetSoundfontPatch);
+        this._soundfontInterpolation.addEventListener("change",this._whenSetSoundfontInterpolation);
+
+
         this._sampleLoadingStatusContainer.addEventListener("click", this._whenSampleLoadingStatusClicked);
 	    this._chipNoiseSelect.addEventListener("change", this._whenSetNoiseWave);
         this._transitionSelect.addEventListener("change", this._whenSetTransition);
@@ -1650,6 +1676,7 @@ export class SongEditor {
         }
 
         this._jumpToModIndicator.addEventListener("click", function () { thisRef._whenClickJumpToModTarget() });
+        soundfontLoadEvents.addEventListener("soundfontloaded", this.whenUpdated); //hopefully not a horrible idea
 
         this._patternArea.addEventListener("mousedown", this.refocusStage);
         this._fadeInOutEditor.container.addEventListener("mousedown", this.refocusStage);
@@ -2180,7 +2207,7 @@ export class SongEditor {
         this._sampleLoadingStatusContainer.style.display = this._doc.prefs.showSampleLoadingStatus ? "" : "none";
         this._instrumentCopyGroup.style.display = this._doc.prefs.instrumentCopyPaste ? "" : "none";
         this._instrumentExportGroup.style.display = this._doc.prefs.instrumentImportExport ? "" : "none";
-        this._instrumentSettingsArea.style.scrollbarWidth = this._doc.prefs.showInstrumentScrollbars ? "" : "none";
+        //this._instrumentSettingsArea.style.scrollbarWidth = this._doc.prefs.showInstrumentScrollbars ? "" : "none";
         if (document.getElementById('text-content'))
             document.getElementById('text-content')!.style.display = this._doc.prefs.showDescription ? "" : "none";
 
@@ -2507,6 +2534,46 @@ export class SongEditor {
             }
             else {
                 this._customWaveDraw.style.display = "none";
+            }
+
+            if (instrument.type == InstrumentType.soundfont) {
+                this._chipWaveSelectRow.style.display = "none";
+                this._useChipWaveAdvancedLoopControlsRow.style.display = "none";
+                this._chipWaveLoopModeSelectRow.style.display = "none";
+                this._chipWaveLoopStartRow.style.display = "none";
+                this._chipWaveLoopEndRow.style.display = "none";
+                this._chipWaveStartOffsetRow.style.display = "none";
+                this._chipWavePlayBackwardsRow.style.display = "none";
+
+                this._soundfontCanLoopRow.style.display = "";
+                this._soundfont.style.display = "";
+                this._soundfontBank.style.display = "";
+                this._soundfontPatch.style.display = "";
+                this._soundfontCanLoop.checked = instrument.soundfont_canLoop;
+                this._soundfontInterpolationRow.style.display = "";
+
+                this._soundfontSelect.replaceChildren("");
+                this._soundfontBankSelect.replaceChildren("");
+                this._soundfontPatchSelect.replaceChildren("");
+                let soundfont = Config.soundfonts[instrument.soundfont];
+                let banks = getSoundfontBankIds(soundfont).map((s: any) => s.toString());
+                let patches = getSoundfontBankInstruments(soundfont, instrument.soundfont_bank).map((s: any) => s.presetName);
+                buildOptions(this._soundfontSelect, Config.soundfonts.map(sf => sf.name));
+                buildOptions(this._soundfontBankSelect, banks);
+                buildOptions(this._soundfontPatchSelect, patches);
+                setSelectedValue(this._soundfontInterpolation, instrument.soundfont_interpolation);
+                if (soundfont != null) {
+                    //setSelectedValue(this._soundfontBankSelect, banks.findIndex((e: any) => e == soundfont.presets[instrument.soundfont_patch].bank.toString()));
+                    //setSelectedValue(this._soundfontPatchSelect, instruments.findIndex((e: any) => e == soundfont.presets[instrument.soundfont_patch].presetName));
+                    setSelectedValue(this._soundfontBankSelect, soundfont.banks.findIndex((e: any) => e.id == instrument.soundfont_bank));
+                    setSelectedValue(this._soundfontPatchSelect, instrument.soundfont_patch);
+                }
+            } else {
+                this._soundfontCanLoopRow.style.display = "none";
+                this._soundfont.style.display = "none";
+                this._soundfontBank.style.display = "none";
+                this._soundfontPatch.style.display = "none";
+                this._soundfontInterpolationRow.style.display = "none";
             }
 
             if (instrument.type == InstrumentType.supersaw) {
@@ -2870,6 +2937,8 @@ export class SongEditor {
                     this._chipWaveStartOffsetRow.style.display = "none";
                     this._chipWavePlayBackwardsRow.style.display = "none";
                     // advloop addition
+            this._soundfontCanLoopRow.style.display = "none";
+            this._soundfontInterpolationRow.style.display = "none";
             this._spectrumRow.style.display = "none";
             this._harmonicsRow.style.display = "none";
             this._transitionRow.style.display = "none";
@@ -4882,6 +4951,26 @@ export class SongEditor {
 
     private _whenSetChipWave = (): void => {
         this._doc.record(new ChangeChipWave(this._doc, this._chipWaveSelect.selectedIndex));
+    }
+
+    private _whenSetSoundfont = (): void => {
+        this._doc.record(new ChangeChosenSoundfont(this._doc, this._soundfontSelect.selectedIndex));
+    }
+
+    private _whenSetSoundfontBank = (): void => {
+        this._doc.record(new ChangeChosenSoundfontBank(this._doc, this._soundfontBankSelect.selectedIndex));
+    }
+
+    private _whenSetSoundfontPatch = (): void => {
+        this._doc.record(new ChangeChosenSoundfontPatch(this._doc, this._soundfontPatchSelect.selectedIndex));
+    }
+
+    private _whenSetSoundfontInterpolation = (): void => {
+        this._doc.record(new ChangeChosenSoundfontInterpolation(this._doc, this._soundfontInterpolation.selectedIndex));
+    }
+
+    private _whenSetSoundfontCanLoop = (): void => {
+        this._doc.record(new ChangeSoundfontCanLoop(this._doc, this._soundfontCanLoop.checked ? true : false));
     }
 
 				 // advloop addition

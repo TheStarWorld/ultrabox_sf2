@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
-import { Algorithm, Dictionary, FilterType, SustainType, InstrumentType, EffectType, AutomationTarget, Config, effectsIncludeDistortion } from "../synth/SynthConfig";
+import { Algorithm, Dictionary, FilterType, SustainType, InstrumentType, EffectType, AutomationTarget, Config, effectsIncludeDistortion, getSoundfontBankIds } from "../synth/SynthConfig";
 import { NotePin, Note, makeNotePin, Pattern, FilterSettings, FilterControlPoint, SpectrumWave, HarmonicsWave, Instrument, Channel, Song, Synth, clamp } from "../synth/synth";
 import { Preset, PresetCategory, EditorConfig } from "./EditorConfig";
 import { Change, ChangeGroup, ChangeSequence, UndoableChange } from "./Change";
@@ -4719,6 +4719,77 @@ export class ChangeChipWave extends Change {
                 instrument.chipWaveStartOffset = 0;
                 // advloop addition
             instrument.preset = instrument.type;
+            doc.notifier.changed();
+            this._didSomething();
+        }
+    }
+}
+
+export class ChangeChosenSoundfont extends Change {
+    constructor(doc: SongDocument, newValue: number) {
+        super();
+        const instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+        if (instrument.soundfont != newValue) {
+            instrument.soundfont = newValue;
+            instrument.soundfont_bank = 0;
+            instrument.soundfont_patch = 0;
+            instrument.preset = instrument.type;
+            doc.notifier.changed();
+            this._didSomething();
+        }
+    }
+}
+
+export class ChangeChosenSoundfontBank extends Change {
+    constructor(doc: SongDocument, newValue: number) {
+        super();
+        const instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+        if (instrument.soundfont_bank != newValue) {
+            let soundfont = Config.soundfonts[instrument.soundfont];
+            let banks = getSoundfontBankIds(soundfont);
+            //let patches = getSoundfontBankInstruments(soundfont, banks[newValue]);
+            instrument.soundfont_bank = banks[newValue];
+            instrument.soundfont_patch = 0;
+            doc.notifier.changed();
+            this._didSomething();
+        }
+    }
+}
+
+export class ChangeChosenSoundfontPatch extends Change {
+    constructor(doc: SongDocument, newValue: number) {
+        super();
+        const instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+        if (instrument.soundfont_patch != newValue) {
+            //let soundfont = Config.soundfonts[instrument.soundfont];
+            //let patches = getSoundfontBankInstruments(soundfont, instrument.soundfont_bank);
+            instrument.soundfont_patch = newValue;
+            doc.notifier.changed();
+            this._didSomething();
+        }
+    }
+}
+
+export class ChangeChosenSoundfontInterpolation extends Change {
+    constructor(doc: SongDocument, newValue: number) {
+        super();
+        const instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+        if (instrument.soundfont_interpolation != newValue) {
+            //let soundfont = Config.soundfonts[instrument.soundfont];
+            //let patches = getSoundfontBankInstruments(soundfont, instrument.soundfont_bank);
+            instrument.soundfont_interpolation = newValue;
+            doc.notifier.changed();
+            this._didSomething();
+        }
+    }
+}
+
+export class ChangeSoundfontCanLoop extends Change {
+    constructor(doc: SongDocument, newValue: boolean) {
+        super();
+        const instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+        if (instrument.soundfont_canLoop != newValue) {
+            instrument.soundfont_canLoop = newValue;
             doc.notifier.changed();
             this._didSomething();
         }
